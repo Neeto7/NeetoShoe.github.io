@@ -11,13 +11,13 @@ interface Product {
   id: number;
   name: string;
   price: number;
-  description: string;
-  images: string[];
-  sizes: string[];
+  description: string | null;
+  images: string[] | null;
+  sizes: string[] | null;
 }
 
 export default function ProductDetail() {
-  const { id } = useParams(); 
+  const { id } = useParams();
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
@@ -58,15 +58,21 @@ export default function ProductDetail() {
     );
 
   return (
-    <main className="min-h-screen px-4 py-10 md:px-8">
+    <main className="min-h-screen px-4 py-10 md:px-8 bg-gray-50">
       <div className="max-w-6xl mx-auto grid md:grid-cols-2 gap-10 items-start">
+        {/* 🖼️ Bagian Gambar */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4 }}
         >
-          <ProductImages images={product.images} name={product.name} />
+          <ProductImages
+            images={product.images || []}
+            name={product.name}
+          />
         </motion.div>
+
+        {/* 📄 Bagian Detail Produk */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -79,8 +85,9 @@ export default function ProductDetail() {
               Rp {Number(product.price).toLocaleString("id-ID")}
             </p>
             <p className="text-gray-600 leading-relaxed mb-6">
-              {product.description}
+              {product.description || "Tidak ada deskripsi untuk produk ini."}
             </p>
+
             {product.sizes && product.sizes.length > 0 && (
               <div className="mb-8">
                 <h3 className="text-lg font-medium mb-3">Pilih Ukuran:</h3>
@@ -102,7 +109,9 @@ export default function ProductDetail() {
               </div>
             )}
           </div>
-         <AddToCartButton productId={product.id} selectedSize={selectedSize} />
+
+          {/* 🛒 Tombol Tambah ke Keranjang */}
+          <AddToCartButton productId={product.id} selectedSize={selectedSize} />
         </motion.div>
       </div>
     </main>

@@ -11,8 +11,10 @@ interface Product {
   price: number;
   sizes: string[];
   images: string[];
-  description: string;
+  description?: string;
   created_at: string;
+  average_rating?: number;
+  is_best_seller?: boolean;
 }
 
 const Catalog = () => {
@@ -23,68 +25,77 @@ const Catalog = () => {
   const observerRef = useRef<HTMLDivElement | null>(null);
   const LIMIT = 8;
 
-
+  // ✅ Fetch data produk dari Supabase
   const fetchProducts = useCallback(async (cursor?: string) => {
-    setLoading(true);
+    try {
+      setLoading(true);
 
-    let query = supabase
-      .from("products")
-      .select("*")
-      .order("created_at", { ascending: false })
-      .limit(LIMIT);
+      let query = supabase
+        .from("products")
+        .select(
+          "id, name, price, sizes, images, description, created_at, average_rating, is_best_seller"
+        )
+        .order("created_at", { ascending: false })
+        .limit(LIMIT);
 
-    if (cursor) query = query.lt("created_at", cursor);
+      if (cursor) query = query.lt("created_at", cursor);
 
-    const { data, error } = await query;
+      const { data, error } = await query;
+      if (error) throw error;
 
-    if (error) {
-      console.error("❌ Error fetching products:", error.message);
-      setLoading(false);
-      return;
-    }
+      if (data && data.length > 0) {
+        const cleaned = data.map((p) => ({
+          ...p,
+          images: Array.isArray(p.images) ? p.images : [],
+          sizes: Array.isArray(p.sizes) ? p.sizes : [],
+        }));
 
-    if (data && data.length > 0) {
-      setProducts((prev) => {
-        const updated = cursor ? [...prev, ...data] : data;
+        setProducts((prev) => {
+          const updated = cursor ? [...prev, ...cleaned] : cleaned;
+          sessionStorage.setItem(
+            "cached_products",
+            JSON.stringify({
+              timestamp: Date.now(),
+              products: updated,
+            })
+          );
+          return updated;
+        });
 
-
-        sessionStorage.setItem(
-          "cached_products",
-          JSON.stringify({
-            timestamp: Date.now(),
-            products: updated,
-          })
-        );
-
-        return updated;
-      });
-
-      setHasMore(data.length >= LIMIT);
-    } else {
+        setHasMore(data.length >= LIMIT);
+      } else {
+        setHasMore(false);
+      }
+    } catch (err) {
+      console.error("❌ Error fetching products:", err);
       setHasMore(false);
+    } finally {
+      setLoading(false);
+      if (!cursor) setTimeout(() => setOverlay(false), 300);
     }
-
-    setLoading(false);
-    if (!cursor) setTimeout(() => setOverlay(false), 300);
   }, []);
 
-
+  // ✅ Ambil cache jika masih valid
   useEffect(() => {
-    const cached = sessionStorage.getItem("cached_products");
-    if (cached) {
-      const parsed = JSON.parse(cached);
-      const expired = Date.now() - parsed.timestamp > 5 * 60 * 1000; // 5 menit
-      if (!expired && parsed.products.length > 0) {
-        setProducts(parsed.products);
-        setLoading(false);
-        setOverlay(false);
-        return;
+    try {
+      const cached = sessionStorage.getItem("cached_products");
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        const expired = Date.now() - parsed.timestamp > 5 * 60 * 1000; // 5 menit
+        if (!expired && parsed.products.length > 0) {
+          setProducts(parsed.products);
+          setLoading(false);
+          setOverlay(false);
+          return;
+        }
       }
+    } catch {
+      console.warn("⚠️ Cache corrupted, fetching fresh data...");
     }
     fetchProducts();
   }, [fetchProducts]);
 
-
+  // ✅ Infinite Scroll
   useEffect(() => {
     if (!hasMore || loading || products.length === 0) return;
 
@@ -102,7 +113,7 @@ const Catalog = () => {
     return () => observer.disconnect();
   }, [hasMore, loading, products, fetchProducts]);
 
-
+  // ✅ Realtime insert listener
   useEffect(() => {
     const channel = supabase
       .channel("products-realtime")
@@ -111,10 +122,15 @@ const Catalog = () => {
         { event: "INSERT", schema: "public", table: "products" },
         (payload) => {
           const newProduct = payload.new as Product;
+          const sanitized = {
+            ...newProduct,
+            images: Array.isArray(newProduct.images) ? newProduct.images : [],
+            sizes: Array.isArray(newProduct.sizes) ? newProduct.sizes : [],
+          };
           setProducts((prev) => {
-            const exists = prev.some((p) => p.id === newProduct.id);
+            const exists = prev.some((p) => p.id === sanitized.id);
             if (exists) return prev;
-            return [newProduct, ...prev];
+            return [sanitized, ...prev];
           });
           sessionStorage.removeItem("cached_products");
         }
@@ -128,7 +144,7 @@ const Catalog = () => {
 
   return (
     <section className="relative py-16 overflow-hidden">
-      {/* ✅ Overlay Loading */}
+      {/* ✅ Overlay Loading Skeleton */}
       <AnimatePresence>
         {overlay && (
           <motion.div
@@ -160,7 +176,7 @@ const Catalog = () => {
           Koleksi Produk Kami
         </h2>
 
-        {/* Grid produk */}
+        {/* ✅ Grid Produk */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
           {products.map((product, index) => (
             <motion.div
@@ -188,9 +204,10 @@ const Catalog = () => {
             ))}
         </div>
 
-        {/* Infinite Scroll trigger */}
+        {/* ✅ Infinite Scroll Trigger */}
         {hasMore && !loading && <div ref={observerRef} className="h-12 w-full" />}
 
+        {/* ✅ Teks saat habis */}
         {!hasMore && !loading && (
           <p className="text-center text-gray-400 mt-10">
             Semua produk sudah ditampilkan.

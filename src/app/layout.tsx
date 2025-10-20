@@ -8,7 +8,6 @@ import Navbar from "@/components/shared/Navbar";
 import Footer from "@/components/shared/Footer";
 import { CartProvider } from "@/components/shared/CartProvider";
 
-
 const montserrat = Montserrat({
   subsets: ["latin"],
   weight: ["400", "700"],
@@ -26,14 +25,20 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className={montserrat.className}>
+      <body className={`${montserrat.className} bg-gray-50`}>
         <AuthProvider>
           <CartProvider>
-          <Navbar/>
-          <ClientLayout>{children}</ClientLayout>
-          <Footer/>
+            {/* Navbar sticky tetap di luar animasi */}
+            <Navbar />
+
+            {/* ClientLayout hanya membungkus halaman */}
+            <main >
+              <ClientLayout>{children}</ClientLayout>
+            </main>
+
+            <Footer />
           </CartProvider>
-          <ToasterClient/>
+          <ToasterClient />
         </AuthProvider>
       </body>
     </html>
